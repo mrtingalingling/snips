@@ -109,3 +109,6 @@ function calMap(roomLoc) {
   return localCal
 }
 
+// https://workspace.google.com/blog/productivity-collaboration/g-suite-pro-tip-how-to-automatically-add-a-schedule-from-google-sheets-into-calendar
+// https://developers.google.com/apps-script/reference/calendar/calendar-app
+// https://www.youtube.com/watch?v=Z0fWGKausWA
