@@ -58,23 +58,24 @@ function runCreateCalEvents() {
 
     // checkCalEvent
     var roomLocCal = calMap(roomLoc) || mainCal;
-    // var roomLocCal = mainCal;  // For debugging
     // Logger.log('Calendar: ' + roomLocCal.getName() + ' - ' + roomLoc);
-    let eventCheck = checkCalEvent(roomLocCal, eventName, startDate_startTime, endDate)
-    if (!eventName) {
-      Logger.log(eventName + ' is blank!');
-      continue;
-    } else if (eventCheck.length == 0) {
-      // createCalendarEvents
-      createCalendarEvent(mainCal, eventName, startDate_startTime, startDate_endTime, endDate, day, roomLoc);
-      Logger.log(eventName + ' Created!');
-    } else if (eventCheck.length > 0 && roomLocCal == mainCal) {
-      for (let k in eventCheck.slice(1, eventCheck.length)) {
-        // Deletes the event.
-        eventCheck[k].deleteEvent();
-        Logger.log('Duplicated ' + eventName + ' Deleted!');
+    if (eventName) {
+      let eventCheckLocal = checkCalEvent(roomLocCal, eventName, startDate_startTime, endDate)
+      let eventCheckMain = checkCalEvent(mainCal, eventName, startDate_startTime, endDate)
+      if (eventCheckLocal.length == 0 && eventCheckMain.length == 0) {
+        // createCalendarEvents
+        createCalendarEvent(mainCal, eventName, startDate_startTime, startDate_endTime, endDate, day, roomLoc);
+        Logger.log(eventName + ' Created!');
       }
     }
+  }
+}
+
+function deleteEvents(cal, eventName, startDate, endDate) {
+  let events = checkCalEvent(cal, eventName, startDate, endDate);
+  for (let k in events) {
+    events[k].deleteEvent();
+    Logger.log(eventName + ' Deleted!');
   }
 }
 
