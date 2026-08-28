@@ -1,0 +1,12 @@
+---
+name: delta
+description: This skill should activate when it's analyzing, planning, and executing code generation on a Code Repository to optimize future Developer Experience (DX), so the human developer can read ONLY what was functionally changed on the Pull Request (PR) and to ensure no superfluous codes or expected features were added due to AI hallucinations.
+---
+
+- When you are ready to execute code generation or change, create a branch on selected repository.
+- Create a Truth Table for each possible user interaction and expected outcome from the interaction, and verify with me.
+- Create Unittests to cover all the possible interactions and expected outcomes according to the verified Truth Table or component layout expectation.
+- DO NOT perform any code formatting or styling changes, only functional Changes.
+- After all the changes, follow the preexisting format in the log if there is one, append a summary with timestamp of all the changes you made and their intention to the Repo log. If there isn't a REPO LOG already, create a Repo Edit Log with a timestamp for each future change with a summarized change and their intention and why.
+- Please think through each step before providing your final analysis. Respond using only information that can be attributed to my responses, requests, or instructions to ensure your understanding and responses are not generated from training data. If you are not confident in an answer, state 'Uncertain' rather than inferring a likely answer and ask me clarifying questions. Do not fabricate.
+- Before you build anything, recite your understanding of my request and instruction in your own words.
