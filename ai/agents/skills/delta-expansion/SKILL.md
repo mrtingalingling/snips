@@ -1,6 +1,6 @@
 ---
 name: reviewable-diffs
-description: Plan and execute code changes so the resulting pull request contains only functional changes — a minimal diff, no formatting churn, no invented features, backed by a truth table and unit tests that cover every interaction. Use this whenever code is being written, modified, refactored, or fixed inside an existing repository; whenever the change will end up in a PR or code review; and whenever the user mentions diff noise, review burden, scope creep, or hallucinated features. Default to using it for any multi-step or multi-file repo change, even when the user doesn't ask for tests or a truth table by name.
+description: Plan and execute code changes so the resulting pull request contains only functional changes — a minimal diff, no formatting churn, no invented features, backed by a truth table, unit tests covering every interaction, and a tracked implementation status. Use this whenever code is being written, modified, refactored, or fixed inside an existing repository; whenever the change will end up in a PR or code review; whenever work is being resumed from a previous session; and whenever the user mentions diff noise, review burden, scope creep, or hallucinated features. Default to using it for any multi-step or multi-file repo change, even when the user doesn't ask for tests, a truth table, or status tracking by name.
 ---
 
 # Reviewable Diffs
@@ -73,6 +73,8 @@ Before finishing, read your own diff line by line and remove anything that isn't
 
 ## Step 9 — Repo edit log
 
+The edit log is **history**: append-only, never edited or rewritten. Current state lives in the implementation status file (Step 10) and never appears here. Keeping that boundary sharp is what stops the two files from drifting apart and contradicting each other.
+
 Check the repository for an existing change log or edit log. If one exists, follow its established format and heading conventions exactly; only the content should be new.
 
 If none exists, create `REPO_EDIT_LOG.md` at the repository root, with a short header explaining that each future change appends an entry here.
@@ -91,6 +93,28 @@ Append one entry per change set:
 
 The "deliberately not changed" line matters as much as the rest: it tells the next reader that an omission was a decision, not an oversight.
 
+## Step 10 — Implementation status
+
+Maintain `IMPLEMENTATION_STATUS.md` as a snapshot of **current state only** — never history, which belongs in the edit log. Overwrite it; do not append. Update it in the same commit as the code change, never as a follow-up step, because a tracker matters most on the runs that get interrupted and those are exactly the runs where a deferred step gets dropped.
+
+Scope the file to the feature or work stream, not the whole repository (`docs/status/<feature>.md` or alongside the feature's code). A single root-level status file is edited by every branch, so it conflicts on merge in almost every PR, and prose conflicts are tedious to resolve.
+
+Write for the next agent session as much as for a human — a human reviewer already has the PR and the diff. That means pointers and state, not narrative.
+
+One row per truth table row:
+
+| Requirement / truth table row | Status | Test | Notes |
+|---|---|---|---|
+
+- Status is one of: **Not started / In progress / Blocked / Done.**
+- **Blocked** requires a reason and what would unblock it.
+- **Done** requires a passing test. If there's no test, it isn't Done — "done" must not be allowed to mean "the agent believes it finished."
+- Anything you could not verify is marked **Uncertain**, not assumed Done.
+
+End the file with a single **Next step:** line naming the one thing the next session should pick up.
+
+If the work is contained in a single PR and won't span sessions, this file is overhead — skip it and add a `**Next step:**` field to the edit log entry instead.
+
 ## Final summary
 
-Report back with: the branch name, the truth table, the tests and their results, the files touched, the log entry you appended, anything marked Uncertain, and any out-of-scope findings you left alone.
+Report back with: the branch name, the truth table, the tests and their results, the files touched, the log entry you appended, the current status table, anything marked Uncertain, and any out-of-scope findings you left alone.

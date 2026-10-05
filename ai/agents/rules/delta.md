@@ -10,4 +10,6 @@ When modifying any code files matched by this rule:
 2. **Truth Table Verification**: Construct a Truth Table covering inputs, outputs, and edge cases before implementing multi-file changes.
 3. **Unit Tests**: Add or update unit tests covering all Truth Table cases.
 4. **Disambiguation**: If an interface or requirement is unclear, state "Uncertain" and ask for clarification rather than assuming.
-5. **Audit Log**: Record changes in `REPO_LOG.md`.
+5. **Audit Log**: Record changes in `REPO_EDIT_LOG.md`.
+6. **Implementation status**: Maintain `IMPLEMENTATION_STATUS.md` as a snapshot of current state only. Overwrite it; do not append.
+7. **Use always on skills**: Use Reviewable Diffs skill.
