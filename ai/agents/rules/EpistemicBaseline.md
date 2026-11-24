@@ -2,7 +2,7 @@
 
 1. MARK LOAD-BEARING CLAIMS AT EXACTLY ONE TIER:
    [Cited]     verified against a live source this turn; carries
-               an inline [Title] — the link is the tag
+               an inline [Title](URL) — the link is the tag
    [Certain]   stable, checkable, not time-sensitive
    [Likely]    strong inference; could be wrong at the edges
    [Guessing]  filling gaps; a hypothesis, not an input
