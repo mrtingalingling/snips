@@ -9,112 +9,34 @@ Code that works today still meets bad deploys, outages, data loss and runaway bi
 
 ## Workflow
 
-1. **Detect the stack and the providers.** Host, database and its provider, CDN, every pay-per-use service (from dependencies and env var names). If `ship-readiness-audit` is installed (workspace `.agents/skills/` or global `~/.gemini/config/skills/`), use its `scripts/triage_scan.py` (run it with `--help` first).
+1. **Detect the stack and the providers.** Host, database and its provider, CDN, every pay-per-use service (from dependencies and env var names). If the `ship-readiness-audit` skill is installed (workspace `.agents/skills/` or global `~/.gemini/config/skills/`), use the `triage_scan.py` script in its `scripts/` folder (run it with `--help` first).
 2. **Audit O1–O11.** Most of these live partly or wholly outside the repo: dashboards, provider settings, DNS. Mark what you can't see as UNKNOWN and write the exact question to close it ("In your DB provider's console, are automated backups on, and what's the retention?"). Don't infer "no backups" from "no backup code".
-3. **Report and stop.** Use the ship-readiness table. Order by consequence: backups, restore test, spend caps and rollback first, because those failures are unrecoverable or unbounded. Ask what to implement.
+3. **Report and stop.** Use the ship-readiness table. Order by consequence: backups, restore test, spend caps and rollback first, because those failures are unrecoverable or unbounded. Ask what to implement. **Skip this step for items the user already approved in this conversation** (through `/ship-check` or the audit's Phase 4): go straight to step 4.
 4. **Implement approved items** one per branch or commit (`reviewable-diffs` if installed). Every Human-only item gets a runbook with exact steps and a verification step. Check vendor setup steps in current docs (`live-source-verification`). Dashboards and SDK init APIs change often.
 5. **Verify**: trigger a test error and see it arrive, curl headers, run the restore drill, and so on. Record the evidence.
 
 Several items depend on others. Do error tracking (O2) and the health endpoint (O5) before alerting (O3). Set up staging (O6) before rehearsing rollback (O7) or restores (O9).
 
-## O1 — Logging
+## Working rules
 
-Good logs answer "what happened to this request?" in one search. Check for:
-- Structured output (JSON or key=value) with timestamp, level, message, and a **request/correlation ID** carried through the request and into downstream calls.
-- Meaningful events logged at boundaries: incoming request summary, outbound calls with duration and status, auth failures, job start/finish.
-- **No secrets or personal data** in log payloads: tokens, passwords, full request bodies, auth headers, raw emails/phone numbers where avoidable. Add a redaction step.
-- Logs shipped somewhere searchable with retention the user knows about. Host-provided logs often keep only a short window, so check and report it.
+- **App type first.** Use the app profile from the audit if one exists, otherwise classify the project with `resources/app-profiles.md` in the `ship-readiness-audit` skill. Mark items N/A for the profile instead of reporting them MISSING, and use the profile's changed meaning where the table says so.
+- **Change discipline.** Use `reviewable-diffs` if installed (workspace `.agents/skills/` or global `~/.gemini/config/skills/`). Otherwise: one approved item per branch or commit; change only the lines that item needs; no formatting, renaming or refactoring churn; no features nobody asked for; add a test that fails without the fix and passes with it; list each file touched and why.
+- **Current facts.** Use `live-source-verification` if installed. Either way, apply the citation rule: any vendor-specific or time-sensitive fact (pricing, plan limits, config keys, CLI flags, SDK and error names, DNS values, legal or store rules) carries an inline [Title](URL) retrieved this session. No URLs from memory. If a source is unreachable, write "Source unavailable" and tag the claim [Unknown].
+- **Confidence tags.** Tag each finding's evidence with exactly one of [Cited], [Certain], [Likely], [Guessing], [Unknown] ([Cited]: checked against a live source this session, with the link; [Certain]: seen directly this session; [Likely]: strong inference; [Guessing]: hypothesis only; [Unknown]: name the gap and what would close it). PASS requires [Certain] or [Cited].
+- **Irreversible steps need their own yes**, even for approved items: rewriting git history, rotating or revoking live keys, DNS changes, production deploys, restoring or deleting data, billing changes.
 
-Prefer the stack's idiomatic structured logger. Don't replace an existing logger without approval.
+## Item playbooks
 
-## O2 — Error tracking
+Detailed guidance for each item is in `resources/items.md`. Read only the sections for the items in scope, plus the **Current requirements** section at the end, which holds externally verified standards and dates:
 
-An error tracker turns "a user said it's broken" into a stack trace with context. Check:
-- SDK initialized on the server and the client (front-end errors are invisible otherwise), plus background workers.
-- DSN/key from env, environment tag (production/staging), and **release/version tag** set from CI (commit SHA). Without release tags you can't tell whether a deploy caused a spike.
-- Source maps uploaded for minified front-end code, and not publicly served if the user cares about that.
-- PII scrubbing settings reviewed. User IDs are usually fine. Passwords and tokens never.
-- Unhandled promise rejections and framework error boundaries captured.
-
-Verify by throwing a deliberate test error in staging and confirming it appears with the right release and environment.
-
-## O3 — Alerting
-
-Alerts should be few, actionable, and owned. Propose a starter set and let the user choose thresholds:
-- Site down (from O5)
-- Error rate or new-issue spike (from O2)
-- Background jobs failing or not running (dead-man's switch, where the job pings a monitor on success)
-- Spend threshold crossed (from O11)
-- Optionally: p95 latency regression (from O4)
-
-For each: the signal, the threshold, where it goes (email, chat channel, phone), and who responds. Noisy alerts get muted and then miss the real incident. If an alert fires and nobody would act, drop it. Channel configuration is a Human task. Alert rules can live in code if the provider supports infrastructure-as-code.
-
-## O4 — Performance monitoring
-
-Two views:
-- **Server**: request latency (p50/p95), throughput, slow endpoints, slow DB queries. Usually via the error tracker's tracing, an APM, or OpenTelemetry. Sample traces in production rather than tracing 100% unless volume is tiny.
-- **Real users (web)**: Core Web Vitals and page-load timing from real browsers, via the host's analytics, the error tracker, or a web-vitals reporter to an endpoint.
-
-Report a baseline if you can measure one (a Lighthouse or equivalent run on key pages). Lab numbers aren't real-user numbers, so label them as lab.
-
-## O5 — Uptime monitoring
-
-Add a health endpoint (e.g. `/health` or `/api/health`) that is cheap, unauthenticated, uncached, and returns non-200 when a critical dependency (database) is unreachable. It shouldn't leak versions or internals publicly.
-
-The monitor itself must run **outside** the hosting provider. A host's own status page doesn't tell you your app is down. Check the health endpoint and the home page, at an interval suited to the app, alerting a human (O3). Setting up the monitor account is a Human task. Write the exact URLs, expected status, and interval.
-
-## O6 — Staging environment
-
-Staging is where you find out a change breaks things before users do. Good looks like:
-- A separate deployment (a long-lived staging branch, or per-PR previews) with **its own database** and its own secrets.
-- Third-party services in test or sandbox mode: payments in test mode, email to a sink or allowlist, LLM calls with a low spend cap.
-- Production-like config: same runtime versions, same build, and environment variables differing only where they must.
-- Not indexed by search engines (noindex header or robots disallow; coordinate with `launch-polish` P1), and ideally behind auth.
-- Never pointing at the production database. Check env var values or names per environment for this specifically. It's the classic staging disaster.
-
-Seed data: synthetic or anonymized, never a raw copy of production personal data unless the user has a lawful reason and has thought about it.
-
-## O7 — Rollback plan for bad deploys
-
-The plan should let someone stressed, at night, return to the last good release in one step. Check and write `ROLLBACK.md`:
-- **How**: the host's "redeploy previous" / instant rollback feature, re-running the deploy job at the previous commit, or redeploying a previous immutable image tag. Write exact commands or clicks.
-- **Database migrations** are the hard part. Code can roll back. Destructive migrations can't. Recommend expand/contract: add new columns/tables first, deploy code that handles both shapes, migrate data, then remove old structures in a later release. Flag any existing migration that drops or renames in one step.
-- **Feature flags** for risky features, so "turn it off" doesn't require a deploy.
-- **Who decides** and how users are told (status page or message).
-
-PASS requires a rehearsal: perform one rollback in staging, record how long it took, and note anything that surprised you.
-
-## O8 — Database backups
-
-Usually a provider setting, so audit by asking or by reading infrastructure config. Good looks like: automated daily (or more frequent) backups, point-in-time recovery if the provider offers it, retention the user has chosen deliberately, stored in a separate location or account from the primary, and encrypted. Also cover uploaded files (object storage) and anything else that can't be regenerated. The database isn't the only data.
-
-If the provider doesn't offer backups on the current plan, propose a scheduled logical dump to separate storage. Treat the job and its storage credentials as production infrastructure: least privilege, failure alerting (O3).
-
-## O9 — Actually test a restore
-
-A backup that has never been restored is a hope, not a backup. The drill:
-1. Restore the latest backup (or a point in time) into a **new, scratch** database. Never restore over production as a test.
-2. Verify with checks written in advance: row counts for key tables within the expected range, latest record timestamp close to the backup time, the app (staging) boots and can read and log in against it, and a few known records exist.
-3. Time it. That's the real recovery time. Compare the backup timestamp to "now", which is the real data-loss window.
-4. Write `RESTORE.md`: exact steps, who has access, credentials location (not the credentials), measured times, date of last drill. Delete the scratch database afterwards.
-5. Put a recurring reminder on the calendar to repeat the drill. Quarterly is a common default, and the interval is a preference, not a rule.
-
-You can script steps 2 and 4 in repo mode. Step 1 usually needs provider access, so it's a Human task with your runbook.
-
-## O10 — Caching
-
-Check response headers on real URLs (`curl -sI <url>`) and the framework or CDN config:
-- **Static assets with content hashes in filenames**: long-lived, immutable caching.
-- **HTML**: short or revalidated caching, so deploys show up.
-- **Authenticated or user-specific responses** must not be publicly cacheable (`private` / `no-store`, correct `Vary`). A CDN serving one user's page to another is a security incident, not a performance bug. Treat any sign of it as a BLOCKER.
-- **API responses**: deliberate. Cache only public, idempotent GETs.
-- **Application caching** (memoized DB queries, Redis) only where there's a measured slow path. Every cache needs an invalidation story.
-
-## O11 — Spend caps and billing alerts
-
-List every pay-per-use provider from dependencies and env var names: cloud/host, database, LLM APIs, email, SMS, maps, storage/bandwidth, search, and anything else metered. For each, write a Human runbook entry:
-- Budget alert at a threshold the user picks, plus one at a higher threshold.
-- A **hard cap** where the provider offers one, and the user's decision on what happens at the cap (service stops vs. keeps billing). Some providers only alert, so say which.
-- Who receives the alert.
-
-In-app (the agent can implement): per-user and global quotas on expensive endpoints (coordinate with `security-hardening` S4 and `llm-hardening`), so one abusive user or a bug in a loop can't spend the monthly budget in an hour. Also check for unbounded retry loops or recursive calls around paid APIs.
+- O1 — Logging
+- O2 — Error tracking
+- O3 — Alerting
+- O4 — Performance monitoring
+- O5 — Uptime monitoring
+- O6 — Staging environment
+- O7 — Rollback plan for bad deploys
+- O8 — Database backups
+- O9 — Actually test a restore
+- O10 — Caching
+- O11 — Spend caps and billing alerts
