@@ -1,6 +1,6 @@
 # Ship-readiness checklist (40 items)
 
-Each item lists where the evidence lives (**repo**, **external**, or **both**), what PASS looks like, how to detect it, and a one-line fix direction. Depth for each area lives in the sibling skill named in the heading.
+Each item lists where the evidence lives (**repo**, **external**, or **both**), what PASS looks like, how to detect it, and a one-line fix direction. Depth for each area lives in the sibling skill named in the heading. Which items apply to which kind of project, and the release items R1–R5 for CLIs and libraries, are in `app-profiles.md`.
 
 ## Contents
 - T — Testing and CI (`test-and-ci`): T1–T7
@@ -14,7 +14,7 @@ Each item lists where the evidence lives (**repo**, **external**, or **both**), 
 ## T — Testing and CI → `test-and-ci`
 
 **T1 CI/CD** · repo
-PASS: a pipeline config (e.g. `.github/workflows/`, `.gitlab-ci.yml`, `circle.yml`, `azure-pipelines.yml`) runs install from lockfile, typecheck/lint, tests and build on every PR, and deploys from the main branch only after those pass.
+PASS: a pipeline config (e.g. `.github/workflows/`, `.gitlab-ci.yml`, `circle.yml`, `azure-pipelines.yml`) runs install from lockfile, typecheck/lint, tests and build on every PR, and deploys from the main branch only after those pass. Third-party actions are pinned to full commit SHAs, and workflow token `permissions` are least-privilege.
 Detect: read the CI config. Check triggers, job order and whether deploy depends on test jobs.
 Fix: add a pipeline with those stages. Keep secrets in the CI secret store.
 
@@ -34,7 +34,7 @@ Detect: commit history of fixes vs. tests added alongside. A test name or commen
 Fix: adopt "no bug fix without a failing test first". Add tests for known past bugs.
 
 **T5 Dependency audit** · repo
-PASS: the ecosystem's audit tool runs in CI. No unaddressed high/critical advisories in production dependencies.
+PASS: the ecosystem's audit tool runs in CI. No unaddressed high/critical advisories in production dependencies. CI installs from the lockfile. A dependency cooldown (minimum release age) is set where the package manager supports it, and install scripts are blocked or allow-listed.
 Detect: run the audit tool for each detected ecosystem and record output.
 Fix: triage by reachability. Do minimal bumps in their own branch. Add the audit to CI.
 
@@ -71,7 +71,7 @@ Detect: limiter middleware/library, its store, which routes use it.
 Fix: per-IP plus per-account limits with a shared store.
 
 **S5 Password reset works** · both
-PASS: single-use, expiring, hashed-at-rest tokens. No account-existence leak. Link built from configured base URL. Sessions invalidated after reset. Tested end-to-end with a real inbox.
+PASS: password rules follow NIST SP 800-63B-4: no composition rules, no forced periodic changes, and new passwords screened against breached and common passwords. Reset uses single-use, expiring, hashed-at-rest tokens. No account-existence leak. Link built from configured base URL. Sessions invalidated after reset. Tested end-to-end with a real inbox.
 Detect: read the flow. Run it in staging.
 Fix: per security-hardening S5. The real-inbox test is a Human or staging task.
 
@@ -81,7 +81,7 @@ Detect: read the flow. Run it in staging.
 Fix: per security-hardening S6.
 
 **S7 SPF / DKIM / DMARC** · external
-PASS: sending domain has one SPF record covering all senders, DKIM for each provider, and a DMARC record with reporting.
+PASS: sending domain has one SPF record covering all senders, DKIM for each provider, and a DMARC record with reporting. At bulk volume (about 5,000+ messages a day to Gmail, Yahoo or Outlook.com), DMARC aligns with the From domain, marketing mail has RFC 8058 one-click unsubscribe, and the spam rate stays under 0.3%.
 Detect: `dig TXT <domain>`, `dig TXT _dmarc.<domain>`, provider's DKIM selector. N/A if the app sends no email.
 Fix: Human DNS edits from the provider's current docs. Start DMARC at `p=none` with reports, then tighten.
 
@@ -98,12 +98,12 @@ Detect: SDK in dependencies and initialized at entrypoints. DSN from env, not ha
 Fix: install and init on server and client. Tag releases in CI.
 
 **O3 Alerting** · external
-PASS: alerts fire to a human channel for error-rate spikes, downtime, failed jobs and spend thresholds, with an owner.
-Detect: ask. Alert rules may be in code (IaC) or dashboards.
+PASS: alerts fire to a human channel for error-rate spikes, downtime, failed jobs and spend thresholds, with an owner. Each alert has been test-fired once and its owner confirmed it arrived.
+Detect: ask. Alert rules may be in code (IaC) or dashboards. Ask when each was last test-fired. An alert nobody has seen arrive counts as PARTIAL.
 Fix: define 3–5 alerts with thresholds. Human configures channels.
 
 **O4 Performance monitoring** · both
-PASS: server latency/throughput tracked. Real-user web vitals collected for the web front end.
+PASS: server latency/throughput tracked. Real-user Core Web Vitals collected for the web front end, judged at the 75th percentile against LCP ≤ 2.5 s, INP ≤ 200 ms and CLS ≤ 0.1.
 Detect: APM/tracing SDK, web-vitals reporting, host-provided analytics.
 Fix: enable tracing in the error tracker or APM. Report web vitals.
 
@@ -150,7 +150,7 @@ Detect: eval directory, scripts, CI step.
 Fix: per llm-hardening A1.
 
 **A2 Prompt-injection testing** · repo
-PASS: untrusted content (user input, retrieved docs, web pages, tool output, uploads) is tested for instruction-following. Tools are least-privilege. Model output is never executed or rendered as raw HTML.
+PASS: untrusted content (user input, retrieved docs, web pages, tool output, uploads) is tested for instruction-following. Tools are least-privilege. Model output is never executed or rendered as raw HTML. Coverage is mapped to the OWASP Top 10 for LLM Applications 2026.
 Detect: test cases for injection, tool permission design, output handling.
 Fix: per llm-hardening A2.
 
@@ -187,7 +187,7 @@ Detect: framework error pages, components with data fetching.
 Fix: per launch-polish P4.
 
 **P5 Accessibility** · both
-PASS: automated scan (e.g. axe) clean on key pages. Keyboard-only pass works. Visible focus, labels, alt text, contrast. Target WCAG 2.2 AA.
+PASS: automated scan (e.g. axe) clean on key pages. Keyboard-only pass works. Visible focus, labels, alt text, contrast. Target WCAG 2.2 AA, which also covers the WCAG 2.1 AA baseline that current laws reference.
 Detect: run an automated scanner. Manual keyboard pass is partly Human.
 Fix: per launch-polish P5.
 
@@ -197,7 +197,7 @@ Detect: analytics SDK, event calls.
 Fix: per launch-polish P6.
 
 **P7 Custom domain and SSL** · external
-PASS: production on the custom domain over HTTPS, HTTP redirects to HTTPS, one canonical host (apex or www), certificate auto-renews.
+PASS: production on the custom domain over HTTPS, HTTP redirects to HTTPS, one canonical host (apex or www), certificate renewal is fully automated and monitored. Maximum public certificate lifetimes are shrinking toward 47 days, so manual renewal won't keep up.
 Detect: `curl -I http://<domain>`, `curl -I https://<domain>`.
 Fix: Human DNS and host settings, plus redirect config.
 
@@ -207,12 +207,12 @@ Detect: routes or pages. Compare to the inventory of SDKs and providers.
 Fix: draft from an accurate data inventory, marked for legal review. Not legal advice.
 
 **P9 Cookie consent** · both
-PASS: if non-essential cookies or trackers are used where consent is required, they don't load until consent. Choice is stored and changeable.
+PASS: if non-essential cookies or trackers are used where consent is required, they don't load until consent. Choice is stored and changeable. Where US state law requires it, a Global Privacy Control signal is honored as an opt-out of sale/sharing and targeted ads, with visible confirmation where required.
 Detect: cookie/tracker inventory, consent tool, whether scripts are gated.
 Fix: per launch-polish P9. Jurisdiction-dependent.
 
 **P10 Account and data deletion** · repo
-PASS: users can delete their account in-product. Deletion covers the primary DB, files, auth provider and third-party processors. Backup retention is documented.
+PASS: users can delete their account in-product. Mobile apps that allow account creation let users start deletion in the app, and Google Play apps also provide a web link for deletion requests. Deletion covers the primary DB, files, auth provider and third-party processors. Backup retention is documented.
 Detect: delete-account flow and what it touches.
 Fix: per launch-polish P10.
 
